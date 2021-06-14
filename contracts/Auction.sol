@@ -48,12 +48,11 @@ contract Auction is ReentrancyGuard {
 
     // events
     event CreteAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint minBid, uint96 increment, address[] contracts, uint[] tokenIds);
-    event PlayerBid(string matchId, contractAddress, tokenId, );
-    event NftWithdrawed(string matchId, address contractAddress, uint tokenId, address winners);
+    event PlayerBidEvent(string matchId, address contractAddress, uint tokenId, uint bid, uint96 expiryBlock);
+    event NftWithdrawedEvent(string matchId, address contractAddress, uint tokenId, address winner);
 
     // base erc20 token
     address public USDC_ADDRESS;
-
 
     // modifier 
     modifier validMatch(string memory matchId) {
@@ -100,7 +99,7 @@ contract Auction is ReentrancyGuard {
 
         // deposit item to contract
         for(uint i = 0; i < contracts.length; ++i) {
-            IERC721(contracts[i]).safeTransferFrom(contracts[i], address(this), tokenIds[i]);
+            IERC721(contracts[i]).safeTransferFrom(msg.sender, address(this), tokenIds[i]);
             // create slots for items
             matchResults[matchId].push(NFTokenAuctionResult(contracts[i], tokenIds[i], ADDRESS_NULL, minBid));
         }
@@ -130,7 +129,12 @@ contract Auction is ReentrancyGuard {
         uint standingBid = matchResults[matchId][tokenIndex].standingBid;
         // check valid amount (> current wining, not doubled value compare to standing bid, sender someone different from winner)
         // known issue: Auction creator should be aware of the case where stadingBid = 1 and min increment >= 1
-        require(amount < 2 * standingBid && amount > standingBid && amount - standingBid >= amatch.minBid * amatch.minIncrement / 100, "illegal increment");
+        require(
+            amount < 2 * standingBid && 
+            amount > standingBid && 
+            amount - standingBid >= amatch.minBid * amatch.minIncrement / 100, 
+            "illegal increment"
+        );
 
         // update the winner for that token
         matchResults[matchId][tokenIndex].standingBid = amount;
@@ -138,14 +142,24 @@ contract Auction is ReentrancyGuard {
 
         // if in MIN_HALF_AUCTION_TIME blocks then extends the auction
         if (amatch.expiryBlock - block.number < MIN_HALF_AUCTION_TIME) {
-            matches[matchId].expiryBlock = amatch.expiryBlock + amatch.expiryExtension;
+            amatch.expiryBlock += amatch.expiryExtension;
+            matches[matchId].expiryBlock = amatch.expiryBlock;
         }
+
         // just transfer (amount - currentBid) of that person to contract
         bytes32 playerBidIndex = keccak256(abi.encodePacked(matchId, tokenIndex));
         uint transferAmount = amount - playerBid[playerAddress][playerBidIndex];
         playerBid[playerAddress][playerBidIndex] = amount;
 
         IERC20(USDC_ADDRESS).safeTransferFrom(msg.sender, address(this), transferAmount);
+
+        emit PlayerBidEvent(
+            matchId, 
+            matchResults[matchId][tokenIndex].contractAddress, 
+            matchResults[matchId][tokenIndex].tokenId, 
+            amount, 
+            amatch.expiryBlock
+        );
     }
 
     function player_withdraw_bid(string memory matchId, uint tokenIndex) external nonReentrant {
@@ -184,7 +198,7 @@ contract Auction is ReentrancyGuard {
 
         // send nft to “address”
         IERC721(result.contractAddress).safeTransferFrom(address(this), recipientAddress, result.tokenId);
-        emit NftWithdrawed(matchId, result.contractAddress, result.tokenId, playerAddress);
+        emit NftWithdrawedEvent(matchId, result.contractAddress, result.tokenId, playerAddress);
     }
 
     function creator_withdraw_nft_batch(string memory matchId) external matchFinished(matchId) creatorOnly(matchId) { // in batch, maybe we will use array for only desired items
