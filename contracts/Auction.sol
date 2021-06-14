@@ -47,7 +47,8 @@ contract Auction is ReentrancyGuard {
     mapping(address => uint)                    private creatorBalance;
 
     // events
-    event CreteAuctionEvent(string matchId, uint96 openBlock, uint96 expiryBlock, uint minBid, uint96 increment, address[] contracts, uint[] tokenIds);
+    event CreteAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint minBid, uint96 increment, address[] contracts, uint[] tokenIds);
+    event PlayerBid(string matchId, contractAddress, tokenId, );
     event NftWithdrawed(string matchId, address contractAddress, uint tokenId, address winners);
 
     // base erc20 token
@@ -64,10 +65,7 @@ contract Auction is ReentrancyGuard {
          require(matches[matchId].creatorAddress == msg.sender, "creator only function"); 
         _;
     }
-    // modifier openMatch() {
-
-    // }
-
+    
     modifier matchFinished(string memory matchId) {
         require(matches[matchId].creatorAddress != ADDRESS_NULL, "invalid match");
         require(matches[matchId].expiryBlock < block.number, "match is not finished");
@@ -116,7 +114,9 @@ contract Auction is ReentrancyGuard {
             expiryExtension, // expiryBlock will be extend (+=) for expiryExtension block(s) if bid updated in range [expiryBlock - expiryExtension + 1 .. expiryBlock]
             minBid 
         );
+
         // emit events
+        emit CreteAuctionEvent(msg.sender, matchId, openBlock, expiryBlock, minBid, minIncrement, contracts, tokenIds);
     }
 
     function player_bid(string memory matchId, uint tokenIndex, uint amount) external nonReentrant validMatch(matchId) {
@@ -187,7 +187,7 @@ contract Auction is ReentrancyGuard {
         emit NftWithdrawed(matchId, result.contractAddress, result.tokenId, playerAddress);
     }
 
-    function creator_withdraw_nft(string memory matchId) external matchFinished(matchId) creatorOnly(matchId) { // in batch, maybe we will use array for only desired items
+    function creator_withdraw_nft_batch(string memory matchId) external matchFinished(matchId) creatorOnly(matchId) { // in batch, maybe we will use array for only desired items
         // check valid matchId, match finished
         address creatorAddress = msg.sender;
         uint minBid = matches[matchId].minBid;
@@ -201,6 +201,16 @@ contract Auction is ReentrancyGuard {
                 IERC721(result.contractAddress).safeTransferFrom(address(this), creatorAddress, result.tokenId);
             }
         }
+    }
+    
+    function creator_withdraw_nft(string memory matchId, uint tokenIndex) external creatorOnly(matchId) {
+        uint minBid = matches[matchId].minBid;
+        NFTokenAuctionResult memory result = matchResults[matchId][tokenIndex];
+        require (result.topBidder == ADDRESS_NULL && result.standingBid == minBid, "token is not available to withdraw");
+        // set standingBid to 0
+        matchResults[matchId][tokenIndex].standingBid = 0;
+        // transfer asset
+        IERC721(result.contractAddress).safeTransferFrom(address(this), msg.sender, result.tokenId);
     }
 
     function functioncreator_withdraw_profit() external { // in batch, maybe we will use array for only desired items to prevent out of gas due to for loop
