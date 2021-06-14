@@ -20,9 +20,9 @@ contract Auction is ReentrancyGuard {
     // structs
     struct NFTokenAuctionResult {
         address contractAddress;
-        uint tokenId;
+        uint    tokenId;
         address topBidder;
-        uint standingBid;
+        uint    standingBid;
     }
 
     struct Match {
@@ -144,7 +144,7 @@ contract Auction is ReentrancyGuard {
         bytes32 playerBidIndex = keccak256(abi.encodePacked(matchId, tokenIndex));
         uint transferAmount = amount - playerBid[playerAddress][playerBidIndex];
         playerBid[playerAddress][playerBidIndex] = amount;
-        
+
         IERC20(USDC_ADDRESS).safeTransferFrom(msg.sender, address(this), transferAmount);
     }
 
