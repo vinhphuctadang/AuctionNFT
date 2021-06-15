@@ -39,7 +39,7 @@ contract Auction is ReentrancyGuard {
     mapping(string => Match)                    public  matches;
 
     // matchId => Result
-    mapping(string => NFTAuctionResult[])   public  matchResults;
+    mapping(string => NFTAuctionResult[])       public  matchResults;
 
     // matchId => player => tokenIndex => price
     mapping(string => mapping(address => mapping(uint => uint))) private playerBid;
@@ -48,7 +48,7 @@ contract Auction is ReentrancyGuard {
     mapping(address => uint)                    private creatorBalance;
 
     // events
-    event CreteAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint minBid, uint96 increment, address[] contracts, uint[] tokenIds);
+    event CreateAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint minBid, uint96 increment, address[] contracts, uint[] tokenIds);
     event PlayerBidEvent(string matchId, address contractAddress, uint tokenId, uint bid, uint96 expiryBlock);
     event RewardEvent(string matchId, address contractAddress, uint tokenId, address winner);
 
@@ -116,7 +116,7 @@ contract Auction is ReentrancyGuard {
         );
 
         // emit events
-        emit CreteAuctionEvent(msg.sender, matchId, openBlock, expiryBlock, minBid, minIncrement, contracts, tokenIds);
+        emit CreateAuctionEvent(msg.sender, matchId, openBlock, expiryBlock, minBid, minIncrement, contracts, tokenIds);
     }
 
     function player_bid(string memory matchId, uint tokenIndex, uint amount) external nonReentrant validMatch(matchId) {
