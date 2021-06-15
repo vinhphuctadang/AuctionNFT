@@ -217,7 +217,7 @@ contract Auction is ReentrancyGuard {
         }
     }
     
-    function creator_withdraw_nft(string memory matchId, uint tokenIndex) external creatorOnly(matchId) {
+    function creator_withdraw_nft(string memory matchId, uint tokenIndex) external matchFinished(matchId) creatorOnly(matchId) {
         uint minBid = matches[matchId].minBid;
         NFTAuctionResult memory result = matchResults[matchId][tokenIndex];
         require (result.topBidder == ADDRESS_NULL && result.standingBid == minBid, "token is not available to withdraw");
