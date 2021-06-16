@@ -4,17 +4,19 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract Auction is ReentrancyGuard {
+contract Auction is ReentrancyGuard, IERC721Receiver {
 
     // using safeErc20 for ierc20 based contract
     using SafeERC20 for IERC20;
 
     // constants
-    address constant ADDRESS_NULL = 0x0000000000000000000000000000000000000000;
-    uint constant MAX_ITEM_PER_AUCTION = 32;
-    uint constant BLOCKS_TO_EXPIRE     = 8;
+    address constant ADDRESS_NULL             = 0x0000000000000000000000000000000000000000;
+    uint    constant MAX_ITEM_PER_AUCTION     = 32;
+    uint    constant BLOCKS_TO_EXPIRE         = 8;
+    bytes4  constant ERC721_ONRECEIVED_RESULT = bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
     // uint constant MAX_UINT96 = type(uint96).max;
 
     // structs
@@ -89,14 +91,14 @@ contract Auction is ReentrancyGuard {
         
         // check valid openBlock, expiryBlock, expiryExtensionOnBidUpdate
         require(expiryBlock > openBlock && openBlock > block.number, "condition expiryBlock > openBlock > current block count not satisfied");
-        require(expiryBlock - openBlock > BLOCKS_TO_EXPIRE * 2, "auction time must be more than 2x BLOCKS_TO_EXPIRE");
+        require(expiryBlock - openBlock > BLOCKS_TO_EXPIRE * 2, "auction time must not less than 2x BLOCKS_TO_EXPIRE");
         // increment 
         // check item count
         require(contracts.length <= MAX_ITEM_PER_AUCTION, "item count must not exceed MAX_ITEM_PER_AUCTION");
         require(contracts.length == tokenIds.length, "contracts and item ids must have the same length");
 
         require(minBid > 0, "min bid should be greater than 0");
-        require(minIncrement < 100 && minBid * minIncrement / 100 > 0, "increment should be greater than 0");
+        require(minIncrement < 100 && minBid * minIncrement / 100 > 0, "increment must be greater than 0 and less than 100%");
 
         // deposit item to contract
         for(uint i = 0; i < contracts.length; ++i) {
@@ -122,7 +124,7 @@ contract Auction is ReentrancyGuard {
     function player_bid(string memory matchId, uint tokenIndex, uint amount) external nonReentrant validMatch(matchId) {
         Match memory amatch = matches[matchId];
         address playerAddress = msg.sender;
-        require(amatch.openBlock < block.number && block.number <= amatch.expiryBlock, "match finished");
+        require(amatch.openBlock < block.number && block.number <= amatch.expiryBlock, "match is not opened for bidding");
 
         // check valid token_index
         require(tokenIndex < matchResults[matchId].length, "token index out of range");
@@ -233,5 +235,22 @@ contract Auction is ReentrancyGuard {
         creatorBalance[msg.sender] = 0;
         // send token
         IERC20(USDC_ADDRESS).safeTransfer(msg.sender, balance);
+    }
+
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external override pure returns (bytes4) {
+        // return ERC721_RECEIVER to conform receving nft
+        return ERC721_ONRECEIVED_RESULT;
+    }
+
+    function get_match(string memory matchId) external view returns(address, uint, uint, uint, uint, uint) {
+        Match memory amatch = matches[matchId];
+        return (
+            amatch.creatorAddress,
+            amatch.minIncrement, 
+            amatch.openBlock,
+            amatch.expiryBlock,
+            amatch.expiryExtension, 
+            amatch.minBid
+        );
     }
 }
