@@ -62,15 +62,16 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
 
     // events
     event CreateAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint96 increment, uint32 expiryExtension, NFT[] nfts);
-    event PlayerBidEvent(string matchId, uint tokenIndex, uint bid, uint96 expiryBlock);
-    event RewardEvent(string matchId, uint tokenIndex, address winner);
+    event PlayerBidEvent(string matchId, address playerAddress, uint tokenIndex, uint bid, uint96 expiryBlock);
+    event RewardEvent(string matchId, uint tokenIndex, address winnerAddress);
 
     // base erc20 token
     address public USDC_ADDRESS;
 
     // modifier 
-    modifier validMatch(string memory matchId) {
+    modifier validTokenIndex(string memory matchId, uint tokenIndex) {
         require(matches[matchId].creatorAddress != ADDRESS_NULL, "invalid match"); 
+        require(tokenIndex < matches[matchId].nftCount, "invalid token");
         _;
     }
 
@@ -79,8 +80,9 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         _;
     }
     
+    // match finished should be used with checking valid match
     modifier matchFinished(string memory matchId) {
-        require(matches[matchId].creatorAddress != ADDRESS_NULL, "invalid match");
+        // require(matches[matchId].creatorAddress != ADDRESS_NULL, "invalid match");
         require(matches[matchId].expiryBlock < block.number, "match is not finished");
         _;
     }
@@ -139,13 +141,10 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         emit CreateAuctionEvent(msg.sender, matchId, openBlock, expiryBlock, minIncrement, expiryExtension, nfts);
     }
 
-    function player_bid(string memory matchId, uint tokenIndex, uint amount) external nonReentrant validMatch(matchId) {
+    function player_bid(string memory matchId, uint tokenIndex, uint amount) external nonReentrant validTokenIndex(matchId, tokenIndex) {
         Match memory amatch = matches[matchId];
         address playerAddress = msg.sender;
         require(amatch.openBlock < block.number && block.number <= amatch.expiryBlock, "match is not opened for bidding");
-
-        // check valid tokenIndex
-        require(tokenIndex < matches[matchId].nftCount, "token index out of range");
         
         AuctionResult memory auctionResult = matchResults[matchId][tokenIndex];
         uint    standingBid     = auctionResult.standingBid;
@@ -177,6 +176,7 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         // emit event
         emit PlayerBidEvent(
             matchId, 
+            playerAddress,
             tokenIndex,
             amount, 
             amatch.expiryBlock
@@ -185,11 +185,10 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
     }
 
     // player can withdraw bid if he is not winner of this match
-    function player_withdraw_bid(string memory matchId, uint tokenIndex) external nonReentrant {
-        // check valid matchId, token_index
-        require(tokenIndex < matches[matchId].nftCount, "token index out of range");
+    function player_withdraw_bid(string memory matchId, uint tokenIndex) external nonReentrant validTokenIndex(matchId, tokenIndex) {
+        
+        // check if player is top bidder 
         address playerAddress = msg.sender;
-
         require(matchResults[matchId][tokenIndex].topBidder != playerAddress, "top bidder cannot withdraw");
 
         uint amount = playerBid[matchId][playerAddress][tokenIndex];
@@ -203,9 +202,7 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
     }
 
     // anyone can call reward, top bidder and creator are incentivized to call this function to send rewards/profit
-    function reward(string memory matchId, uint tokenIndex) external matchFinished(matchId) {
-
-        require(tokenIndex < matches[matchId].nftCount, "token index out of range");
+    function reward(string memory matchId, uint tokenIndex) external validTokenIndex(matchId, tokenIndex) matchFinished(matchId) {
         
         address winnerAddress  = matchResults[matchId][tokenIndex].topBidder;
         require(winnerAddress != ADDRESS_NULL, "winner is not valid");
@@ -233,7 +230,7 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
     }
 
     // çreator withdraws unused nft
-    function creator_withdraw_nft_batch(string memory matchId) external matchFinished(matchId) creatorOnly(matchId) { 
+    function creator_withdraw_nft_batch(string memory matchId) external creatorOnly(matchId) matchFinished(matchId) { 
         // check valid matchId, match finished
         uint _len = matches[matchId].nftCount;
         for(uint i = 0; i < _len; ++i) {
@@ -248,7 +245,7 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         }
     }
     
-    function creator_withdraw_nft(string memory matchId, uint tokenIndex) external matchFinished(matchId) creatorOnly(matchId) {
+    function creator_withdraw_nft(string memory matchId, uint tokenIndex) external validTokenIndex(matchId, tokenIndex) creatorOnly(matchId) matchFinished(matchId) {
         AuctionResult memory result = matchResults[matchId][tokenIndex];
         require (result.topBidder == ADDRESS_NULL && result.standingBid > 0, "token is not available to withdraw");
         
@@ -281,5 +278,17 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
             amatch.expiryExtension,
             amatch.nftCount
         );
+    }
+
+    function get_current_result(string memory matchId, uint tokenIndex) external view returns (address, uint) {
+        return (matchResults[matchId][tokenIndex].topBidder, matchResults[matchId][tokenIndex].standingBid);
+    }
+
+    function get_player_bid(string memory matchId, address playerAddress, uint tokenIndex) external view returns(uint) {
+        return playerBid[matchId][playerAddress][tokenIndex];
+    }
+
+    function get_creator_balance(address creatorAddress) external view returns(uint) {
+        return creatorBalance[creatorAddress];
     }
 }

@@ -6,9 +6,7 @@ module.exports = {
         let depositEvent = tx.logs.filter(event => event.event === eventName)
         assert.strictEqual(depositEvent.length, 1)
             
-        let args = depositEvent[0].args 
-        logger.debug("Event args:", args)
-
+        let args = depositEvent[0].args
         let cnt = 0
         for(let key in expectedData) {
             let x
@@ -63,6 +61,7 @@ module.exports = {
             logger.debug("auctionContract:", auctionContract.address);
             assert(auctionContract.address != "", "Auction address is null");
 
+            // transfer mock assets
             let owner;
             for(let tokenId of ["1", "2", "3"]) {
                 await mockyEarth.safeTransferFrom(Tony, Thor, tokenId);
@@ -75,6 +74,11 @@ module.exports = {
                 owner = await mockyMars.ownerOf(tokenId);
                 assert.strictEqual(owner, Thor, `Expected ${Thor}, actual ${owner}`);
             }
+
+            // transfer initial amount of money
+            await usdcContract.transfer(Thor, 100000);
+            await usdcContract.transfer(Steve, 100000);
+            await usdcContract.transfer(Natasha, 100000);
        })
     },
 

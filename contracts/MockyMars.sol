@@ -9,5 +9,10 @@ contract MockyMars is ERC721 {
         _safeMint(msg.sender, 0x1);
         _safeMint(msg.sender, 0x2);
         _safeMint(msg.sender, 0x3);
+
+        // create more mock tokens
+        for(uint i = 4; i<38; ++i) {
+            _safeMint(msg.sender, i);
+        }
     }
 }

@@ -4,8 +4,9 @@ const utils = require('./utils')
 
 contract("Test fail cases create auction", accounts => {
     utils.deployAllContracts(accounts)
-    it("should not let player withdraw on invalid token index", async()=>{
 
+    it("should not let player withdraw on invalid token index", async()=>{
+        
     })
 
     it("should not let topBidder withdraw Bid", async()=>{

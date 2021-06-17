@@ -207,10 +207,35 @@ contract("Test fail cases create auction", accounts => {
 
 contract("Test fail cases create auction", accounts => {
     utils.deployAllContracts(accounts)
-    it("should successfully create a match and get events", async()=>{
 
+    it("shoud not allow creating contract having 2 same nft", async()=>{
         // approve token
         await mockyEarth.approve(auctionContract.address, "1", {from: Thor})
+
+        let blockCount = await utils.getBlockCount();
+
+        utils.testError(async()=>{
+            await auctionContract.createAuction(
+                "thorMatch", blockCount + 2, 
+                blockCount + 30, 10, 20,
+                [ 
+                    {
+                        contractAddress: mockyEarth.address,
+                        tokenId: "1",
+                        minBid: 100
+                    },
+                    {
+                        contractAddress: mockyEarth.address,
+                        tokenId: "1",
+                        minBid: 200
+                    }
+                ],
+                {from: Thor}
+            )
+        }, "reason", "ERC721: transfer of token that is not own")
+    })
+
+    it("should successfully create a match and get events", async()=>{
         // create match
         let blockCount = await utils.getBlockCount();
 
@@ -262,14 +287,17 @@ contract("Test fail cases create auction", accounts => {
             expiryExtension: 10,
             nfts: `${mockyEarth.address},1,100`
         }
-        logger.info("Expected event:", expectedEvent)
-        // expect createAuctionEvent
+
+        // expect createAuctionEvent == expectedEvent
         utils.eventEquals(tx, "CreateAuctionEvent", expectedEvent)
 
-        // CreateAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint96 increment, NFT[] nfts);
+        // expect owner is contract
         let owner;
         owner = await mockyEarth.ownerOf("1")
         // owner should be contract
         assert.strictEqual(owner.toString(), auctionContract.address.toString())
     })
+
+    // it("should not create auction with number of nft exceeds limit", async()=>{
+    // })
 })
