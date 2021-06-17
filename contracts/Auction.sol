@@ -192,7 +192,7 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         require(matchResults[matchId][tokenIndex].topBidder != playerAddress, "top bidder cannot withdraw");
 
         uint amount = playerBid[matchId][playerAddress][tokenIndex];
-        require(amount > 0, "bid must be greater than 0");
+        require(amount > 0, "bid must be greater than 0 to withdraw");
 
         // reset bid amount        
         playerBid[matchId][playerAddress][tokenIndex] = 0;
