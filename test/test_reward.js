@@ -36,7 +36,7 @@ function createAuction(){
         let expectedMatchData = [
             Thor,
             "20",
-            (blockCount + 5).toString(),
+            openBlock.toString(),
             expiryBlock.toString(),
             "10",
             "2"
@@ -51,7 +51,6 @@ function createAuction(){
 
         // deep equals just produces weird error on types
         assert.strictEqual(JSON.stringify(matchData), JSON.stringify(expectedMatchData));
-
         logger.info("created match will be ended at:", expiryBlock)
     })
 }
@@ -138,5 +137,8 @@ contract("Test fail cases create auction", accounts => {
 
         creatorBalance = await auctionContract.get_creator_balance(Thor)
         assert.strictEqual(creatorBalance.toString(), "200")
+
+        // check if owner of the nft "1" is changed to natasha
+        assert.strictEqual(await mockyEarth.ownerOf("1"), Natasha)
     })
 })

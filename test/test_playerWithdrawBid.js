@@ -2,6 +2,7 @@ const assert = require("assert")
 const logger = require("./logger")
 const utils = require('./utils')
 
+let expiryBlock, openBlock
 function createAuction(){
     it("should create an auction with 2 nft from 2 erc71", async()=>{
         // approve 
@@ -35,7 +36,7 @@ function createAuction(){
         let expectedMatchData = [
             Thor,
             "20",
-            (blockCount + 5).toString(),
+            openBlock.toString(),
             expiryBlock.toString(),
             "10",
             "2"

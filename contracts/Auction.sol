@@ -46,19 +46,19 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
 
     // state
     // matchId => Match
-    mapping(string => Match)                    public  matches;
+    mapping(string => Match) public  matches;
 
     // matchId => index => NFT
-    mapping(string => mapping(uint => NFT))     public  matchNFTs;
+    mapping(string => mapping(uint => NFT)) public  matchNFTs;
     
     // matchId => Result
-    mapping(string => mapping(uint => AuctionResult))            public  matchResults;
+    mapping(string => mapping(uint => AuctionResult)) public  matchResults;
     
     // matchId => player => tokenIndex => price
     mapping(string => mapping(address => mapping(uint => uint))) private playerBid;
 
     // address to balance
-    mapping(address => uint)                    private creatorBalance;
+    mapping(address => uint) private creatorBalance;
 
     // events
     event CreateAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint96 increment, uint32 expiryExtension, NFT[] nfts);

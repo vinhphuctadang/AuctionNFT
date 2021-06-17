@@ -92,7 +92,7 @@ contract("Test player bid on invalid inputs", accounts => {
         await usdcContract.approve(auctionContract.address, 140, {from: Steve})
         await usdcContract.approve(auctionContract.address, 500, {from: Natasha})
         await utils.generateBlock(helperContract, openBlock + 1, Steve)
-        
+
         await utils.testError(async()=>{
             await auctionContract.player_bid("thorMatch", 2, 120, {from: Steve})
         }, "reason", "invalid token")
@@ -248,5 +248,9 @@ contract("test player bid on valid cases", accounts =>{
 
         let natasha = await auctionContract.get_player_bid("thorMatch", Natasha, 1)
         assert.strictEqual(natasha.toString(), "240")
+
+        // check if nft 1 is also bidded by natasha
+        natasha = await auctionContract.get_player_bid("thorMatch", Natasha, 0)
+        assert.strictEqual(natasha.toString(), "160")
     })
 })
