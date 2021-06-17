@@ -224,23 +224,26 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         emit RewardEvent(matchId, tokenIndex, winnerAddress);
     }
 
+    function process_withdraw_nft(string memory matchId, uint tokenIndex) private {
+        // set standingBid to 0 to prevent withdraw again
+        matchResults[matchId][tokenIndex].standingBid = 0;
+        // transfer asset
+        NFT memory nft = matchNFTs[matchId][tokenIndex];
+        IERC721(nft.contractAddress).safeTransferFrom(address(this), msg.sender, nft.tokenId);
+    }
+
     // çreator withdraws unused nft
     function creator_withdraw_nft_batch(string memory matchId) external matchFinished(matchId) creatorOnly(matchId) { 
         // check valid matchId, match finished
-        address creatorAddress = msg.sender;
         uint _len = matches[matchId].nftCount;
         for(uint i = 0; i < _len; ++i) {
             
             // consider result
             AuctionResult memory result = matchResults[matchId][i];
             
-            // if no one wins the token
+            // if no one wins the token then withdraw 
             if (result.topBidder == ADDRESS_NULL && result.standingBid > 0) {
-                // set standingBid to 0, also prevent reentrancy 
-                matchResults[matchId][i].standingBid = 0;
-                // transfer asset
-                NFT memory nft = matchNFTs[matchId][i];
-                IERC721(nft.contractAddress).safeTransferFrom(address(this), creatorAddress, nft.tokenId);
+                process_withdraw_nft(matchId, i);
             }
         }
     }
@@ -248,11 +251,8 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
     function creator_withdraw_nft(string memory matchId, uint tokenIndex) external matchFinished(matchId) creatorOnly(matchId) {
         AuctionResult memory result = matchResults[matchId][tokenIndex];
         require (result.topBidder == ADDRESS_NULL && result.standingBid > 0, "token is not available to withdraw");
-        // set standingBid to 0 to prevent withdraw again
-        matchResults[matchId][tokenIndex].standingBid = 0;
-        // transfer asset
-        NFT memory nft = matchNFTs[matchId][tokenIndex];
-        IERC721(nft.contractAddress).safeTransferFrom(address(this), msg.sender, nft.tokenId);
+        
+        process_withdraw_nft(matchId, tokenIndex);
     }
 
     function creator_withdraw_profit() external { // in batch, maybe we will use array for only desired items to prevent out of gas due to for loop
