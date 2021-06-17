@@ -14,17 +14,25 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
 
     // constants
     address constant ADDRESS_NULL             = 0x0000000000000000000000000000000000000000;
+    
+    // max item allow per auction, should not be more than 2^32-1
     uint    constant MAX_ITEM_PER_AUCTION     = 32;
+    
     uint    constant BLOCKS_TO_EXPIRE         = 8;
+    
     bytes4  constant ERC721_ONRECEIVED_RESULT = bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
     // uint constant MAX_UINT96 = type(uint96).max;
 
     // structs
-    struct NFTAuctionResult {
+    struct NFT {
         address contractAddress;
         uint    tokenId;
+        uint    minBid;
+    }
+    
+    struct AuctionResult {
         address topBidder;
-        uint    standingBid;
+        uint standingBid;
     }
 
     struct Match {
@@ -32,17 +40,20 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         uint96 minIncrement; // percentage based
         uint96 openBlock;
         uint96 expiryBlock;
-        uint64 expiryExtension; // expiryBlock will be extend (+=) for expiryExtension block(s) if bid updated in range [expiryBlock - expiryExtension + 1 .. expiryBlock]
-        uint   minBid; // minimum bid for all assets in this auction
+        uint32 expiryExtension; // expiryBlock will be extend (+=) for expiryExtension block(s) if bid updated in range [expiryBlock - expiryExtension + 1 .. expiryBlock]
+        uint32 nftCount;
     }
 
     // state
     // matchId => Match
     mapping(string => Match)                    public  matches;
 
+    // matchId => index => NFT
+    mapping(string => mapping(uint => NFT))     public  matchNFTs;
+    
     // matchId => Result
-    mapping(string => NFTAuctionResult[])       public  matchResults;
-
+    mapping(string => mapping(uint => AuctionResult))            public  matchResults;
+    
     // matchId => player => tokenIndex => price
     mapping(string => mapping(address => mapping(uint => uint))) private playerBid;
 
@@ -50,9 +61,9 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
     mapping(address => uint)                    private creatorBalance;
 
     // events
-    event CreateAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint minBid, uint96 increment, address[] contracts, uint[] tokenIds);
-    event PlayerBidEvent(string matchId, address contractAddress, uint tokenId, uint bid, uint96 expiryBlock);
-    event RewardEvent(string matchId, address contractAddress, uint tokenId, address winner);
+    event CreateAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint96 increment, NFT[] nfts);
+    event PlayerBidEvent(string matchId, uint tokenIndex, uint bid, uint96 expiryBlock);
+    event RewardEvent(string matchId, uint tokenIndex, address winner);
 
     // base erc20 token
     address public USDC_ADDRESS;
@@ -82,29 +93,35 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         string memory matchId, 
         uint96 openBlock, 
         uint96 expiryBlock,
-        uint64 expiryExtension,
+        uint32 expiryExtension,
         uint96 minIncrement, 
-        uint minBid,
-        address[] memory contracts, uint[] memory tokenIds) external nonReentrant {
+        NFT[] memory nfts) external nonReentrant {
+
         // check if matchId is occupied
         require(matches[matchId].creatorAddress == ADDRESS_NULL, "matchId is occupied");
         
         // check valid openBlock, expiryBlock, expiryExtensionOnBidUpdate
         require(expiryBlock > openBlock && openBlock > block.number, "condition expiryBlock > openBlock > current block count not satisfied");
-        require(expiryBlock - openBlock > BLOCKS_TO_EXPIRE * 2, "auction time must not less than 2x BLOCKS_TO_EXPIRE");
-        // increment 
-        // check item count
-        require(contracts.length <= MAX_ITEM_PER_AUCTION, "item count must not exceed MAX_ITEM_PER_AUCTION");
-        require(contracts.length == tokenIds.length, "contracts and item ids must have the same length");
+        require(expiryBlock - openBlock > BLOCKS_TO_EXPIRE * 2,      "auction time must not less than 2x BLOCKS_TO_EXPIRE");
 
-        require(minBid > 0, "min bid should be greater than 0");
-        require(minIncrement < 100 && minBid * minIncrement / 100 > 0, "increment must be greater than 0 and less than 100%");
+        // check increment
+        require(minIncrement < 100, "increment must be greater than 0 and less than 100%");
+        
+        // check item count
+        require(nfts.length > 0 && nfts.length <= MAX_ITEM_PER_AUCTION, "number of nft must be greater than 0 and less than MAX_ITEM_PER_AUCTION");
 
         // deposit item to contract
-        for(uint i = 0; i < contracts.length; ++i) {
-            IERC721(contracts[i]).safeTransferFrom(msg.sender, address(this), tokenIds[i]);
+        for(uint i = 0; i < nfts.length; ++i) {
+            
+            require(nfts[i].minBid > 1, "minBid must be greater than 1");
+            require(minIncrement * nfts[i].minBid / 100 > 0, "increment should be greater than 0");
+            
+            // if meet requirements then send tokens to contract
+            IERC721(nfts[i].contractAddress).safeTransferFrom(msg.sender, address(this), nfts[i].tokenId);
+            
             // create slots for items
-            matchResults[matchId].push(NFTAuctionResult(contracts[i], tokenIds[i], ADDRESS_NULL, minBid));
+            matchResults[matchId][i]    = AuctionResult(ADDRESS_NULL, nfts[i].minBid);
+            matchNFTs[matchId][i]       = nfts[i];
         }
 
         // create match
@@ -114,11 +131,11 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
             openBlock,
             expiryBlock,
             expiryExtension, // expiryBlock will be extend (+=) for expiryExtension block(s) if bid updated in range [expiryBlock - expiryExtension + 1 .. expiryBlock]
-            minBid 
+            uint32(nfts.length)
         );
 
         // emit events
-        emit CreateAuctionEvent(msg.sender, matchId, openBlock, expiryBlock, minBid, minIncrement, contracts, tokenIds);
+        emit CreateAuctionEvent(msg.sender, matchId, openBlock, expiryBlock, minIncrement, nfts);
     }
 
     function player_bid(string memory matchId, uint tokenIndex, uint amount) external nonReentrant validMatch(matchId) {
@@ -126,23 +143,26 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         address playerAddress = msg.sender;
         require(amatch.openBlock < block.number && block.number <= amatch.expiryBlock, "match is not opened for bidding");
 
-        // check valid token_index
-        require(tokenIndex < matchResults[matchId].length, "token index out of range");
-        NFTAuctionResult storage tokenResult = matchResults[matchId][tokenIndex];
-        uint    standingBid     = tokenResult.standingBid;
+        // check valid tokenIndex
+        require(tokenIndex < matches[matchId].nftCount, "token index out of range");
+        
+        AuctionResult memory auctionResult = matchResults[matchId][tokenIndex];
+        uint    standingBid     = auctionResult.standingBid;
+        uint    nftMinBid       = matchNFTs[matchId][tokenIndex].minBid;
+        uint    increment       = nftMinBid * amatch.minIncrement / 100;
+        
         // check valid amount (> current wining, not doubled value compare to standing bid, sender someone different from winner)
         // known issue: Auction creator should be aware of the case where stadingBid = 1 and min increment >= 1
         require(
             amount < 2 * standingBid && 
             amount > standingBid && 
-            amount - standingBid >= amatch.minBid * amatch.minIncrement / 100, 
+            amount - standingBid >= increment, 
             "illegal increment"
         );
 
         // update the winner for that token
-        tokenResult.standingBid = amount;
-        tokenResult.topBidder   = playerAddress;
-
+        matchResults[matchId][tokenIndex] = AuctionResult(playerAddress, amount);
+    
         // if in BLOCKS_TO_EXPIRE blocks then extends the auction expiry time
         if (amatch.expiryBlock - block.number < BLOCKS_TO_EXPIRE) {
             amatch.expiryBlock += amatch.expiryExtension;
@@ -152,11 +172,11 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         // just transfer (amount - currentBid) of that person to contract
         uint transferAmount = amount - playerBid[matchId][playerAddress][tokenIndex]; // sure that amount always higher than current
         playerBid[matchId][playerAddress][tokenIndex] = amount;
-
+    
+        // emit event
         emit PlayerBidEvent(
             matchId, 
-            tokenResult.contractAddress, 
-            tokenResult.tokenId, 
+            tokenIndex,
             amount, 
             amatch.expiryBlock
         );
@@ -166,7 +186,7 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
     // player can withdraw bid if he is not winner of this match
     function player_withdraw_bid(string memory matchId, uint tokenIndex) external nonReentrant {
         // check valid matchId, token_index
-        require(tokenIndex < matchResults[matchId].length, "token index out of range");
+        require(tokenIndex < matches[matchId].nftCount, "token index out of range");
         address playerAddress = msg.sender;
 
         require(matchResults[matchId][tokenIndex].topBidder != playerAddress, "top bidder cannot withdraw");
@@ -184,73 +204,80 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
     // anyone can call reward, top bidder and creator are incentivized to call this function to send rewards/profit
     function reward(string memory matchId, uint tokenIndex) external matchFinished(matchId) {
 
-        require(tokenIndex < matchResults[matchId].length, "token index out of range");
+        require(tokenIndex < matches[matchId].nftCount, "token index out of range");
         
-        NFTAuctionResult memory result = matchResults[matchId][tokenIndex];
-        address winnerAddress  = result.topBidder;
+        address winnerAddress  = matchResults[matchId][tokenIndex].topBidder;
+        require(winnerAddress != ADDRESS_NULL, "winner is not valid");
 
-        // set top bidder to null
-        matchResults[matchId][tokenIndex].topBidder = ADDRESS_NULL;
+        // set result to null
+        matchResults[matchId][tokenIndex] = AuctionResult(ADDRESS_NULL, 0);
 
         // increase creator's balance
         uint standingBid = playerBid[matchId][winnerAddress][tokenIndex];
         playerBid[matchId][winnerAddress][tokenIndex]   = 0;
         creatorBalance[matches[matchId].creatorAddress] += standingBid;
-
+        
+        NFT memory nft = matchNFTs[matchId][tokenIndex];
         // send nft to “address”
-        IERC721(result.contractAddress).safeTransferFrom(address(this), winnerAddress, result.tokenId);
-        emit RewardEvent(matchId, result.contractAddress, result.tokenId, winnerAddress);
+        IERC721(nft.contractAddress).safeTransferFrom(address(this), winnerAddress, nft.tokenId);
+        emit RewardEvent(matchId, tokenIndex, winnerAddress);
     }
 
     // çreator withdraws unused nft
     function creator_withdraw_nft_batch(string memory matchId) external matchFinished(matchId) creatorOnly(matchId) { 
         // check valid matchId, match finished
         address creatorAddress = msg.sender;
-        uint minBid = matches[matchId].minBid;
-        uint _len = matchResults[matchId].length;
+        uint _len = matches[matchId].nftCount;
         for(uint i = 0; i < _len; ++i) {
-            NFTAuctionResult memory result = matchResults[matchId][i];
-            if (result.topBidder == ADDRESS_NULL && result.standingBid == minBid) {
-                // set standingBid to 0
+            
+            // consider result
+            AuctionResult memory result = matchResults[matchId][i];
+            
+            // if no one wins the token
+            if (result.topBidder == ADDRESS_NULL && result.standingBid > 0) {
+                // set standingBid to 0, also prevent reentrancy 
                 matchResults[matchId][i].standingBid = 0;
                 // transfer asset
-                IERC721(result.contractAddress).safeTransferFrom(address(this), creatorAddress, result.tokenId);
+                NFT memory nft = matchNFTs[matchId][i];
+                IERC721(nft.contractAddress).safeTransferFrom(address(this), creatorAddress, nft.tokenId);
             }
         }
     }
     
     function creator_withdraw_nft(string memory matchId, uint tokenIndex) external matchFinished(matchId) creatorOnly(matchId) {
-        uint minBid = matches[matchId].minBid;
-        NFTAuctionResult memory result = matchResults[matchId][tokenIndex];
-        require (result.topBidder == ADDRESS_NULL && result.standingBid == minBid, "token is not available to withdraw");
-        // set standingBid to 0
+        AuctionResult memory result = matchResults[matchId][tokenIndex];
+        require (result.topBidder == ADDRESS_NULL && result.standingBid > 0, "token is not available to withdraw");
+        // set standingBid to 0 to prevent withdraw again
         matchResults[matchId][tokenIndex].standingBid = 0;
         // transfer asset
-        IERC721(result.contractAddress).safeTransferFrom(address(this), msg.sender, result.tokenId);
+        NFT memory nft = matchNFTs[matchId][tokenIndex];
+        IERC721(nft.contractAddress).safeTransferFrom(address(this), msg.sender, nft.tokenId);
     }
 
     function creator_withdraw_profit() external { // in batch, maybe we will use array for only desired items to prevent out of gas due to for loop
         uint balance = creatorBalance[msg.sender];
         require(balance > 0, "creator balance must be greater than 0");
+        
+        // reset balance 
         creatorBalance[msg.sender] = 0;
-        // send token
+        
+        // send money
         IERC20(USDC_ADDRESS).safeTransfer(msg.sender, balance);
     }
 
     function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external override pure returns (bytes4) {
-        // return ERC721_RECEIVER to conform receving nft
+        // return ERC721_ONRECEIVED_RESULT to conform the interface
         return ERC721_ONRECEIVED_RESULT;
     }
 
-    function get_match(string memory matchId) external view returns(address, uint, uint, uint, uint, uint) {
+    function get_match(string memory matchId) external view returns(address, uint, uint, uint, uint) {
         Match memory amatch = matches[matchId];
         return (
             amatch.creatorAddress,
             amatch.minIncrement, 
             amatch.openBlock,
             amatch.expiryBlock,
-            amatch.expiryExtension, 
-            amatch.minBid
+            amatch.expiryExtension
         );
     }
 }
