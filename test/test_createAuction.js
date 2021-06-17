@@ -2,166 +2,208 @@ const assert = require("assert")
 const logger = require("./logger")
 const utils = require('./utils')
 
-contract("Test fail cases create auction", accounts => {
-    utils.deployAllContracts(accounts)
+// contract("Test fail cases create auction", accounts => {
+//     utils.deployAllContracts(accounts)
 
-    it("should not create matchId = thorMatch when the matchId is occupied", async()=>{
-        //logger.debug("Thor address:", Thor);
-        let matchId = "thorNftMatch"
-        logger.info("Creating valid match ...")
-        // approve token
-        await mockyEarth.approve(auctionContract.address, "1", {from: Thor})
+//     it("should not create matchId = thorMatch when the matchId is occupied", async()=>{
+//         //logger.debug("Thor address:", Thor);
+//         let matchId = "thorNftMatch"
+//         logger.info("Creating valid match ...")
+//         // approve token
+//         await mockyEarth.approve(auctionContract.address, "1", {from: Thor})
 
-        // create auction
-        let blockCount = await utils.getBlockCount();
+//         // create auction
+//         let blockCount = await utils.getBlockCount();
 
-        await auctionContract.createAuction(
-            matchId, blockCount + 2, 
-            blockCount + 30, 10, 20, 100,
-            [ mockyEarth.address ],
-            ["1"],
-            {from: Thor}
-        )
+//         await auctionContract.createAuction(
+//             matchId, blockCount + 2, 
+//             blockCount + 30, 10, 20,
+//             [ {
+//                 contractAddress: mockyEarth.address,
+//                 tokenId: "1",
+//                 minBid: 100
+//             } ],
+//             {from: Thor}
+//         )
 
-        logger.info("Creating match with the same Id ...")
+//         logger.info("Creating match with the same Id ...")
+//         blockCount = await utils.getBlockCount();
+//         await mockyEarth.approve(auctionContract.address, "2", {from: Thor})
+//         // create match with same Id
+//         await utils.testError(
+//             async () => { 
+//                 await auctionContract.createAuction(
+//                     matchId, blockCount + 2, 
+//                     blockCount + 30, 10, 20,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "2",
+//                         minBid: 100
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             }, "reason", "matchId is occupied")
+//     })
+
+//     it("should not create match when openBlock < block.number or openBlock == block.number", async()=>{
+//         let blockCount = await utils.getBlockCount();
+//         await utils.testError(
+//             async () => {
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount - 1, 
+//                     blockCount + 100, 10, 20,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "2",
+//                         minBid: 100
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "condition expiryBlock > openBlock > current block count not satisfied");
+
+//         await utils.testError(
+//             async () => { 
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount, 
+//                     blockCount + 100, 10, 20,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "2",
+//                         minBid: 100
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "condition expiryBlock > openBlock > current block count not satisfied");
+//     })
+
+//     it("should not create match when openBlock > expiryBlock", async()=>{
+//         let blockCount = await utils.getBlockCount();
+//         await utils.testError(
+//             async () => { 
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount + 30, 
+//                     blockCount + 5, 10, 20,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "2",
+//                         minBid: 100
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "condition expiryBlock > openBlock > current block count not satisfied");
+//     })
+
+//     it("should not create match when expiryBlock - openBlock < 2 * BLOCKS_TO_EXPIRE", async()=>{
+//         // expiryBlock - openBlock < 2 * BLOCKS_TO_EXPIRE
+//         // TODO: Try again for this case
+//         let blockCount = await utils.getBlockCount();
+//         await utils.testError(
+//             async () => { 
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount + 2, 
+//                     blockCount + 8, 10, 20,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "2",
+//                         minBid: 100
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "auction time must not less than 2x BLOCKS_TO_EXPIRE");
+//     })
+
+//     it("should not create match when there is some minBid == 0", async()=>{
+//         let blockCount = await utils.getBlockCount();
+//         await utils.testError(
+//             async () => {
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount + 2, 
+//                     blockCount + 19, 10, 20,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "2",
+//                         minBid: 0
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "minBid must be greater than 1");
+//     })
+
+//     it("should not create match when minIncrement >= 100", async()=>{
+//         let blockCount = await utils.getBlockCount();
+//         await utils.testError(
+//             async () => { 
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount + 2, 
+//                     blockCount + 19, 10, 101,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "2",
+//                         minBid: 100
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "increment must be greater than 0 and less than 100%");
+//     })
+
+//     it("should not create match when minIncrement = 0", async()=>{
+//         let blockCount = await utils.getBlockCount();
+//         await utils.testError(
+//             async () => { 
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount + 2, 
+//                     blockCount + 19, 10, 1,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "2",
+//                         minBid: 20
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "increment should be greater than 0");
+//     })
+
+//     it("should not create match when fails to deposit tokens", async()=>{
+//         let blockCount = await utils.getBlockCount();
+//         await utils.testError(
+//             async () => { 
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount + 2, 
+//                     blockCount + 19, 10, 20,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "1",
+//                         minBid: 100
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "ERC721: transfer of token that is not own");
         
-        await mockyEarth.approve(auctionContract.address, "2", {from: Thor})
-        // create match with same Id
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    matchId, blockCount + 5, 
-                    blockCount + 30, 10, 20, 100,
-                    [ mockyEarth.address ],
-                    ["2"],
-                    {from: Thor}
-                )
-            }, "reason", "matchId is occupied")
-    })
-
-    it("should not create match when openBlock < block.number or openBlock ==block.number", async()=>{
-        let blockCount = await utils.getBlockCount();
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount - 1, 
-                    blockCount + 100, 10, 20, 100,
-                    [ mockyEarth.address ],
-                    ["2"]
-                )
-            },
-            "reason", "condition expiryBlock > openBlock > current block count not satisfied");
-
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount, 
-                    blockCount + 10, 10, 20, 100,
-                    [ mockyEarth.address ],
-                    ["2"]
-                )
-            },
-            "reason", "condition expiryBlock > openBlock > current block count not satisfied");
-    })
-
-    it("should not create match when openBlock > expiryBlock", async()=>{
-        let blockCount = await utils.getBlockCount();
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount + 31, 
-                    blockCount + 20, 10, 20, 100,
-                    [ mockyEarth.address ],
-                    ["2"]
-                )
-            },
-            "reason", "condition expiryBlock > openBlock > current block count not satisfied");
-    })
-
-    it("should not create match when expiryBlock - openBlock < 2 * BLOCKS_TO_EXPIRE", async()=>{
-        // expiryBlock - openBlock < 2 * BLOCKS_TO_EXPIRE
-        // TODO: Try again for this case
-        let blockCount = await utils.getBlockCount();
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount + 2, 
-                    blockCount + 8, 10, 20, 100,
-                    [ mockyEarth.address ],
-                    ["2"]
-                )
-            },
-            "reason", "auction time must not less than 2x BLOCKS_TO_EXPIRE");
-    })
-
-    it("should not create match when minBid == 0", async()=>{
-        let blockCount = await utils.getBlockCount();
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount + 2, 
-                    blockCount + 19, 10, 20, 0,
-                    [ mockyEarth.address ],
-                    ["2"]
-                )
-            },
-            "reason", "min bid should be greater than 0");
-    })
-
-    it("should not create match when minIncrement >= 100", async()=>{
-        let blockCount = await utils.getBlockCount();
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount + 2, 
-                    blockCount + 19, 10, 100, 50,
-                    [ mockyEarth.address ],
-                    ["2"]
-                )
-            },
-            "reason", "increment must be greater than 0 and less than 100%");
-    })
-
-    it("should not create match when minIncrement = 0", async()=>{
-        let blockCount = await utils.getBlockCount();
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount + 2, 
-                    blockCount + 19, 10, 1, 50,
-                    [ mockyEarth.address ],
-                    ["2"]
-                )
-            },
-            "reason", "increment must be greater than 0 and less than 100%");
-    })
-
-    it("should not create match when fails to deposit tokens", async()=>{
-        let blockCount = await utils.getBlockCount();
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount + 2, 
-                    blockCount + 19, 10, 20, 50,
-                    [ mockyEarth.address ],
-                    ["1"]
-                )
-            },
-            "reason", "ERC721: transfer of token that is not own");
-        
-        blockCount = await utils.getBlockCount();
-        await utils.testError(
-            async () => { 
-                await auctionContract.createAuction(
-                    "thorMatch", blockCount + 2, 
-                    blockCount + 19, 10, 20, 50,
-                    [ mockyEarth.address ],
-                    ["4"]
-                )
-            },
-            "reason", "ERC721: operator query for nonexistent token");
-    })
-})
+//         blockCount = await utils.getBlockCount();
+//         await utils.testError(
+//             async () => { 
+//                 await auctionContract.createAuction(
+//                     "thorMatch", blockCount + 2, 
+//                     blockCount + 19, 10, 20,
+//                     [ {
+//                         contractAddress: mockyEarth.address,
+//                         tokenId: "4",
+//                         minBid: 100
+//                     } ],
+//                     {from: Thor}
+//                 )
+//             },
+//             "reason", "ERC721: operator query for nonexistent token");
+//     })
+// })
 
 contract("Test fail cases create auction", accounts => {
     utils.deployAllContracts(accounts)
@@ -172,11 +214,14 @@ contract("Test fail cases create auction", accounts => {
         // create match
         let blockCount = await utils.getBlockCount();
 
-        await auctionContract.createAuction(
+        let tx = await auctionContract.createAuction(
             "thorMatch", blockCount + 2, 
-            blockCount + 30, 10, 20, 100,
-            [ mockyEarth.address ],
-            ["1"],
+            blockCount + 30, 10, 20,
+            [ {
+                contractAddress: mockyEarth.address,
+                tokenId: "1",
+                minBid: 100
+            } ],
             {from: Thor}
         )
 
@@ -202,12 +247,26 @@ contract("Test fail cases create auction", accounts => {
             (blockCount + 2).toString(),
             (blockCount + 30).toString(),
             "10",
-            "100"
+            "1"
         ]
 
         // deep equals just produces weird error on types
         assert.strictEqual(JSON.stringify(matchData), JSON.stringify(expectedMatchData));
-        
+
+        let expectedEvent = {
+            creatorAddress: Thor, 
+            matchId: "thorMatch",
+            openBlock: blockCount + 2,
+            expiryBlock: blockCount + 30,
+            increment: 20,
+            expiryExtension: 10,
+            nfts: `${mockyEarth.address},1,100`
+        }
+        logger.info("Expected event:", expectedEvent)
+        // expect createAuctionEvent
+        utils.eventEquals(tx, "CreateAuctionEvent", expectedEvent)
+
+        // CreateAuctionEvent(address creatorAddress, string matchId, uint96 openBlock, uint96 expiryBlock, uint96 increment, NFT[] nfts);
         let owner;
         owner = await mockyEarth.ownerOf("1")
         // owner should be contract

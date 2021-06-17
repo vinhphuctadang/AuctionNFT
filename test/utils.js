@@ -7,16 +7,13 @@ module.exports = {
         assert.strictEqual(depositEvent.length, 1)
             
         let args = depositEvent[0].args 
+        logger.debug("Event args:", args)
+
         let cnt = 0
         for(let key in expectedData) {
             let x
             x = args[key]
-            assert.strictEqual(x.toString(), expectedData[key].toString())
-            
-            // use order
-            x = args[cnt.toString()]
-            assert.strictEqual(x.toString(), expectedData[key].toString())
-
+            assert.strictEqual(x.toString(), expectedData[key].toString(), `Error on field ${key}`)
             cnt ++;
         }       
     },
