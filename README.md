@@ -125,3 +125,9 @@ function creator_withdraw_profit() external
 ```
 
 * Creator withdraw profit received from all auctions the made
+
+---
+
+# Acknowledgement
+
+- Contract templates from @openzeppelin team at https://github.com/OpenZeppelin/openzeppelin-contracts
