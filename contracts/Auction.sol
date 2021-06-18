@@ -252,7 +252,7 @@ contract Auction is ReentrancyGuard, IERC721Receiver {
         process_withdraw_nft(matchId, tokenIndex);
     }
 
-    function creator_withdraw_profit() external { // in batch, maybe we will use array for only desired items to prevent out of gas due to for loop
+    function creator_withdraw_profit() external {
         uint balance = creatorBalance[msg.sender];
         require(balance > 0, "creator balance must be greater than 0");
         
